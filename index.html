@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChatBubble Demo</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(224, 185, 115, 0.18), transparent 28%),
+          linear-gradient(180deg, #f6f3ef 0%, #f1ede6 100%);
+        color: #1f2933;
+      }
+
+      main {
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 80px 24px 120px;
+      }
+
+      h1 {
+        font-size: clamp(2.6rem, 6vw, 4.8rem);
+        line-height: 0.95;
+        margin: 0 0 16px;
+      }
+
+      p {
+        max-width: 60ch;
+        line-height: 1.7;
+        font-size: 1.05rem;
+      }
+
+      .card {
+        margin-top: 32px;
+        padding: 24px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(22, 66, 60, 0.08);
+        box-shadow: 0 18px 50px rgba(16, 24, 40, 0.08);
+        backdrop-filter: blur(10px);
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: rgba(22, 66, 60, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p>Embeddable AI chat widget</p>
+      <h1>Floating website chat in one script.</h1>
+      <p>
+        This page demonstrates the library running as an overlay. The sample configuration sends requests with
+        <code>fetch</code> to the bundled local demo endpoint and renders the response back into the chat window.
+      </p>
+      <div class="card">
+        <strong>Sample payload</strong>
+        <p>The widget POSTs JSON shaped like <code>{ message, history }</code> to your configured URL.</p>
+      </div>
+    </main>
+
+    <script src="./chatbubble.js"></script>
+    <script>
+      window.ChatBubbleWidget.create({
+        url: '/demo/chat',
+        iconUrl: './assets/chat-icon.svg',
+        title: 'Site Assistant',
+        welcomeMessage: 'Ask anything about this website.',
+        themeColors: {
+          primary: '#A44A3F',
+          background: '#F6EEE7',
+          surface: '#FFFDF9',
+          userBubble: '#A44A3F',
+          botBubble: '#EFE2D3',
+          border: '#E0CBB7'
+        }
+      });
+    </script>
+  </body>
+</html>
