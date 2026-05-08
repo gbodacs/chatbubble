@@ -38,7 +38,8 @@
     onMessageSent: null,
     onResponse: null,
     onError: null,
-    startMinimized: false
+    startMinimized: false,
+    openai: true
   };
 
   function isPlainObject(value) {
@@ -161,9 +162,48 @@
             object-fit: contain;
           }
 
-          .panel {
+          .chatbubble-root {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
             width: ${width}px;
             height: ${height}px;
+            z-index: 2147483000;
+            font-family: Arial, sans-serif;
+            color: ${themeColors.text};
+            pointer-events: none;
+          }
+
+          .launcher,
+          .panel {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            pointer-events: auto;
+            transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s ease;
+            will-change: opacity, transform;
+          }
+
+          .launcher {
+            width: 64px;
+            height: 64px;
+            border: 0;
+            border-radius: 999px;
+            background: ${themeColors.primary};
+            box-shadow: 0 18px 35px rgba(16, 24, 40, 0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            opacity: 1;
+            transform: translateY(0);
+            visibility: visible;
+          }
+
+          .panel {
+            width: 100%;
+            height: 100%;
             display: grid;
             grid-template-rows: auto 1fr auto;
             overflow: hidden;
@@ -171,10 +211,17 @@
             border-radius: 22px;
             background: ${themeColors.surface};
             box-shadow: 0 24px 60px rgba(16, 24, 40, 0.18);
+            opacity: 1;
+            transform: translateY(0);
+            visibility: visible;
+            transform-origin: bottom right;
           }
 
-          .hidden {
-            display: none;
+          .is-hidden {
+            opacity: 0;
+            transform: translateY(12px);
+            visibility: hidden;
+            pointer-events: none;
           }
 
           .header {
@@ -315,7 +362,10 @@
               right: 12px;
               left: 12px;
               bottom: 12px;
+              width: auto;
+              height: min(${height}px, 75vh);
             }
+          }
 
             .panel {
               width: min(100%, 100vw - 24px);
@@ -386,8 +436,11 @@
     }
 
     syncVisibility() {
-      this.panel.classList.toggle('hidden', !this.isOpen);
-      this.launcherButton.classList.toggle('hidden', this.isOpen);
+      this.panel.classList.toggle('is-hidden', !this.isOpen);
+      this.launcherButton.classList.toggle('is-hidden', this.isOpen);
+
+      this.panel.setAttribute('aria-hidden', String(!this.isOpen));
+      this.launcherButton.setAttribute('aria-hidden', String(this.isOpen));
 
       if (this.isOpen) {
         requestAnimationFrame(() => {
@@ -446,6 +499,22 @@
 
       this.setSending(true);
 
+      const openai = this.config.openai;
+      if (openai && openai.stream) {
+        try {
+          await this.sendOpenAIStream(text);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Request failed.';
+          this.addMessage('assistant', `Sorry, something went wrong. ${message}`);
+          if (typeof this.config.onError === 'function') {
+            this.config.onError(error);
+          }
+        } finally {
+          this.setSending(false);
+        }
+        return;
+      }
+
       try {
         const reply = await this.sendMessage(text);
         this.addMessage('assistant', reply);
@@ -465,7 +534,99 @@
       }
     }
 
+    buildOpenAIMessages(text) {
+      const { systemPrompt } = this.config.openai;
+      const messages = [];
+
+      if (systemPrompt) {
+        messages.push({ role: 'system', content: systemPrompt });
+      }
+
+      // history already includes the user message we just added, exclude it
+      for (const entry of this.history.slice(0, -1)) {
+        messages.push({ role: entry.role === 'user' ? 'user' : 'assistant', content: entry.text });
+      }
+
+      messages.push({ role: 'user', content: text });
+      return messages;
+    }
+
+    openAIFetchOptions(text, stream) {
+      const { apiKey = "",
+         model = 'openai.gpt-oss-120b', 
+         baseUrl = 'https://bedrock-mantle.eu-central-1.api.aws/v1' } = this.config.openai;
+      const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+      const headers = { 'Content-Type': 'application/json' };
+      if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+      const body = JSON.stringify({ model, messages: this.buildOpenAIMessages(text), stream });
+      return { url, init: { method: 'POST', headers, body, ...this.config.fetchOptions } };
+    }
+
+    async sendOpenAIStream(text) {
+      const { url, init } = this.openAIFetchOptions(text, true);
+      const response = await fetch(url, init);
+
+      if (!response.ok) {
+        throw new Error(`Endpoint returned ${response.status}`);
+      }
+
+      const entry = { role: 'assistant', text: '' };
+      this.history.push(entry);
+      const messageEl = document.createElement('div');
+      messageEl.className = 'message message-assistant';
+      this.messagesElement.appendChild(messageEl);
+      this.scrollMessages();
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const data = trimmed.slice(5).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (typeof delta === 'string') {
+              entry.text += delta;
+              messageEl.textContent = entry.text;
+              this.scrollMessages();
+            }
+          } catch {
+            // skip malformed SSE lines
+          }
+        }
+      }
+
+      if (typeof this.config.onResponse === 'function') {
+        this.config.onResponse(entry.text, this.history.slice());
+      }
+    }
+
     async sendMessage(text) {
+      if (this.config.openai) {
+        const { url, init } = this.openAIFetchOptions(text, false);
+        const response = await fetch(url, init);
+        if (!response.ok) {
+          throw new Error(`Endpoint returned ${response.status}`);
+        }
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (typeof content === 'string') return content;
+        throw new Error('Unexpected response format from OpenAI-compatible API.');
+      }
+
       const payload = typeof this.config.buildPayload === 'function'
         ? this.config.buildPayload(text, this.history.slice())
         : { message: text, history: this.history.slice() };
