@@ -66,11 +66,16 @@
     <script src="./chatbubble.js"></script>
     <script>
       window.ChatBubbleWidget.create({
-        url: '/demo/chat',
+        url: 'http://localhost:8080/chatapi/tudatai',
         iconUrl: './assets/chat-icon.svg',
-        title: 'Site Assistant',
-        welcomeMessage: 'Ask anything about this website.',
-        themeColors: {
+        title: 'Weboldal Segéd',
+        welcomeMessage: 'Kérdezz bátran, segítek!',
+        subtitle: 'Chat a segéddel',
+        placeholder: 'Ide írja kérdését...',
+        sendLabel: 'Küldés',
+        launcherAriaLabel: 'Chat megnyitása',
+        minimizeAriaLabel: 'Chat minimalizálása',
+        themeColors: { 
           primary: '#4a9b85',
           background: '#d6f0f0', 
           surface: '#F9FFF9',

@@ -6,17 +6,19 @@
     );
 
   const DEFAULTS = {
-    url: '/api/chat',
+    url: '',
+    iconUrl: '',
+    title: '',
+    welcomeMessage: '',
     target: document.body,
-    title: 'AI Chat',
-    welcomeMessage: 'How can I help you today?',
-    placeholder: 'Type your message...',
-    sendLabel: 'Send',
-    launcherAriaLabel: 'Open chat',
-    minimizeAriaLabel: 'Minimize chat',
+    subtitle: '',
+    placeholder: '',
+    sendLabel: '',
+    launcherAriaLabel: '',
+    minimizeAriaLabel: '',
     width: 360,
     height: 520,
-    iconUrl: DEFAULT_ICON,
+    iconUrl: DEFAULT_ICON, 
     headers: {
       'Content-Type': 'application/json'
     },
@@ -118,7 +120,7 @@
     }
 
     render() {
-      const { themeColors, width, height, iconUrl, title, placeholder, sendLabel } = this.config;
+      const { themeColors, width, height, iconUrl, title, subtitle, placeholder, sendLabel } = this.config;
 
       this.shadowRoot.innerHTML = `
         <style>
@@ -389,7 +391,7 @@
                 </div>
                 <div class="title-wrap">
                   <p class="title">${this.escapeHtml(title)}</p>
-                  <p class="subtitle">Chat with your assistant</p>
+                  <p class="subtitle">${this.escapeHtml(subtitle)}</p>
                 </div>
               </div>
               <button class="icon-button minimize" type="button" aria-label="${this.escapeAttribute(this.config.minimizeAriaLabel)}">−</button>
@@ -552,15 +554,15 @@
     }
 
     openAIFetchOptions(text, stream) {
-      const { apiKey = "",
-         model = 'openai.gpt-oss-120b', 
-         baseUrl = 'https://bedrock-mantle.eu-central-1.api.aws/v1' } = this.config.openai;
-      const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+      const apiKey = this.config.openai.apiKey
+      const baseUrl = this.config.url
+      const url = `${baseUrl.replace(/\/$/, '')}`;
       const headers = { 'Content-Type': 'application/json' };
       if (apiKey) {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
-      const body = JSON.stringify({ model, messages: this.buildOpenAIMessages(text), stream });
+      const body = JSON.stringify({ messages: this.buildOpenAIMessages(text), stream });
+      console.log('OpenAI Fetch Options:', { url, headers, body });
       return { url, init: { method: 'POST', headers, body, ...this.config.fetchOptions } };
     }
 
